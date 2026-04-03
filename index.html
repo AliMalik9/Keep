@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KEEP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000000;
+            color: #f5f5f5;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333333; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555555; }
+
+        iconify-icon[icon*="-linear"] { stroke-width: 1.5; stroke: currentColor; }
+
+        /* --- Rich Text Editor Styling --- */
+        .rich-textarea { outline: none; word-break: break-word; transition: all 0.2s; line-height: 1.5; }
+        .rich-textarea:empty:before { content: attr(data-placeholder); color: #737373; pointer-events: none; display: block; }
+        .rich-content ul, .rich-textarea ul { list-style-type: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
+        .rich-content ol, .rich-textarea ol { list-style-type: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }
+        .rich-content b, .rich-textarea b { font-weight: 700; color: #ffffff; }
+        .rich-content i, .rich-textarea i { font-style: italic; }
+        .rich-content strike, .rich-textarea strike { text-decoration: line-through; opacity: 0.5; }
+        
+        /* --- Perfectly Smooth Drag & Drop --- */
+        .sortable-ghost { opacity: 0 !important; }
+        .sortable-drag { cursor: grabbing !important; }
+        .sortable-fallback { 
+            opacity: 1 !important; 
+            box-shadow: none !important; 
+            border: 1px solid #333333 !important; 
+            background-color: #111111 !important; 
+            cursor: grabbing !important; 
+            z-index: 9999;
+        }
+        .card-wrapper { cursor: grab; }
+        .card-wrapper:active { cursor: grabbing; }
+
+        /* --- Monochrome Checkbox --- */
+        input[type="checkbox"] {
+            appearance: none; width: 18px; height: 18px; border: 1.5px solid #404040;
+            border-radius: 5px; cursor: pointer; position: relative; transition: all 0.2s ease-in-out;
+            flex-shrink: 0; margin-top: 1px; background-color: transparent;
+        }
+        input[type="checkbox"]:hover { border-color: #737373; }
+        input[type="checkbox"]:checked { background-color: #ffffff; border-color: #ffffff; }
+        input[type="checkbox"]:checked::after {
+            content: ''; position: absolute; left: 5.5px; top: 2px; width: 4px; height: 9px;
+            border: solid #000000; border-width: 0 2px 2px 0; transform: rotate(45deg);
+        }
+        .checked-text strike { text-decoration: line-through; color: #737373; transition: color 0.2s; }
+        .checked-text .checklist-item-text { text-decoration: line-through; color: #737373; }
+        
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="h-screen w-full antialiased overflow-hidden relative">
+
+    <div id="lockScreen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#000000] transition-opacity duration-500">
+        <div class="w-full max-w-md bg-[#111111] p-10 rounded-[32px] border border-[#262626] flex flex-col items-center shadow-2xl transition-all duration-300" id="lockBox">
+            
+            <div class="w-12 h-12 bg-[#1a1a1a] text-white rounded-2xl flex items-center justify-center border border-[#333333] mb-6">
+                <iconify-icon icon="solar:lock-password-bold" width="24"></iconify-icon>
+            </div>
+            
+            <h2 id="lockTitle" class="text-[22px] font-bold text-white mb-2 text-center transition-all duration-200">Welcome to Keep</h2>
+            <p id="lockSubtitle" class="text-[#a3a3a3] text-center mb-8 text-[15px] transition-all duration-200">Create a 4-digit PIN to secure your notes on this device.</p>
+
+            <div class="flex gap-4 justify-center mb-4" id="pinContainer">
+                <input type="password" maxlength="1" inputmode="numeric" class="pin-digit w-14 h-16 bg-[#0a0a0a] border border-[#262626] text-white rounded-2xl text-center text-3xl font-bold focus:outline-none focus:ring-2 focus:ring-white/20 transition-all">
+                <input type="password" maxlength="1" inputmode="numeric" class="pin-digit w-14 h-16 bg-[#0a0a0a] border border-[#262626] text-white rounded-2xl text-center text-3xl font-bold focus:outline-none focus:ring-2 focus:ring-white/20 transition-all">
+                <input type="password" maxlength="1" inputmode="numeric" class="pin-digit w-14 h-16 bg-[#0a0a0a] border border-[#262626] text-white rounded-2xl text-center text-3xl font-bold focus:outline-none focus:ring-2 focus:ring-white/20 transition-all">
+                <input type="password" maxlength="1" inputmode="numeric" class="pin-digit w-14 h-16 bg-[#0a0a0a] border border-[#262626] text-white rounded-2xl text-center text-3xl font-bold focus:outline-none focus:ring-2 focus:ring-white/20 transition-all">
+            </div>
+            
+            <p id="pinError" class="text-red-400 text-sm font-medium mb-2 hidden">Incorrect PIN. Please try again.</p>
+
+            <div class="w-full h-px bg-[#262626] my-8"></div>
+
+            <div id="importSection" class="w-full text-center transition-all duration-300">
+                <p class="text-[#737373] text-[14px] mb-3">Already have notes on another device?</p>
+                <button onclick="document.getElementById('importBackupInput').click()" class="text-gray-300 hover:text-white font-medium text-[14px] flex items-center justify-center gap-2 w-full transition-colors">
+                    <iconify-icon icon="solar:import-bold" width="18"></iconify-icon> Import Backup File (.keep)
+                </button>
+                <input type="file" id="importBackupInput" accept=".keep" class="hidden">
+            </div>
+
+            <button id="cancelImportBtn" class="hidden text-[#737373] hover:text-white font-medium text-[14px] transition-colors mt-2">
+                Cancel Import
+            </button>
+        </div>
+    </div>
+
+    <div id="appUI" class="h-full w-full flex p-4 md:p-8 gap-6 lg:gap-8 opacity-0 pointer-events-none transition-opacity duration-500">
+        
+        <aside class="w-64 bg-[#111111] rounded-3xl p-3 hidden md:flex flex-col border border-[#262626] h-full shrink-0">
+            <div class="px-4 py-4 mb-3 flex items-center gap-3">
+                <div class="w-8 h-8 bg-[#1e1e1e] text-white rounded-xl flex items-center justify-center border border-[#333333]">
+                    <iconify-icon icon="solar:lightbulb-bolt-bold" width="20"></iconify-icon>
+                </div>
+                <span class="text-[19px] font-semibold tracking-tight text-white">KEEP</span>
+            </div>
+
+            <nav class="flex-1 space-y-1.5">
+                <a href="#" class="flex items-center justify-between px-3 py-2.5 bg-[#1e1e1e] rounded-xl group cursor-pointer border border-[#262626]">
+                    <div class="flex items-center gap-3">
+                        <iconify-icon icon="solar:notes-minimalistic-bold" width="20" class="text-white"></iconify-icon>
+                        <span class="text-sm font-medium text-white">Notes</span>
+                    </div>
+                </a>
+                <a href="#" class="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[#1e1e1e] cursor-pointer transition-colors">
+                    <div class="flex items-center gap-3 text-[#a3a3a3] group-hover:text-white">
+                        <iconify-icon icon="solar:bell-linear" width="20"></iconify-icon>
+                        <span class="text-sm font-medium text-[#a3a3a3] group-hover:text-white">Reminders</span>
+                    </div>
+                </a>
+                <a href="#" class="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[#1e1e1e] cursor-pointer transition-colors">
+                    <div class="flex items-center gap-3 text-[#a3a3a3] group-hover:text-white">
+                        <iconify-icon icon="solar:pen-new-round-linear" width="20"></iconify-icon>
+                        <span class="text-sm font-medium text-[#a3a3a3] group-hover:text-white">Edit labels</span>
+                    </div>
+                </a>
+                <a href="#" class="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[#1e1e1e] cursor-pointer transition-colors group">
+                    <div class="flex items-center gap-3 text-[#a3a3a3] group-hover:text-red-400 transition-colors">
+                        <iconify-icon icon="solar:trash-bin-trash-linear" width="20"></iconify-icon>
+                        <span class="text-sm font-medium text-[#a3a3a3] group-hover:text-red-400 transition-colors">Trash</span>
+                    </div>
+                </a>
+            </nav>
+        </aside>
+
+        <main class="flex-1 flex flex-col h-full overflow-hidden">
+            
+            <header class="flex items-center justify-between mb-10 shrink-0 pt-2 px-2 md:px-0">
+                <div>
+                    <h1 class="text-[24px] font-semibold text-white tracking-tight">My Workspace</h1>
+                    <p class="text-[#a3a3a3] text-[14px] mt-1">All notes are encrypted and safely stored on this device.</p>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <div class="hidden sm:flex items-center bg-[#111111] rounded-[14px] px-4 py-2.5 border border-[#262626] focus-within:border-[#555] focus-within:ring-4 focus-within:ring-white/5 transition-all w-64">
+                        <iconify-icon icon="solar:magnifer-linear" width="18" class="text-[#737373] mr-2.5"></iconify-icon>
+                        <input type="text" id="searchInput" placeholder="Search your notes..." class="bg-transparent w-full text-[14px] outline-none placeholder-[#737373] text-white">
+                    </div>
+                    
+                    <button id="viewToggle" class="p-2.5 bg-[#111111] rounded-[14px] border border-[#262626] text-[#a3a3a3] hover:text-white hover:bg-[#1e1e1e] transition-colors flex items-center justify-center" title="Change View">
+                        <iconify-icon icon="solar:gallery-minimalistic-linear" width="22" id="viewIcon"></iconify-icon>
+                    </button>
+                    
+                    <div class="relative group">
+                        <button id="exportBtn" class="p-2.5 bg-[#111111] rounded-[14px] border border-[#262626] text-[#a3a3a3] hover:text-white hover:bg-[#1e1e1e] transition-colors flex items-center justify-center gap-2 px-4" title="Create Backup">
+                            <iconify-icon icon="solar:export-bold" width="20"></iconify-icon>
+                            <span class="text-sm font-semibold hidden sm:block">Backup</span>
+                        </button>
+                        <div class="absolute right-0 top-full mt-2 w-64 p-3 bg-[#1a1a1a] border border-[#333333] text-[13px] text-[#d4d4d4] rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-left shadow-2xl leading-relaxed">
+                            Download a secure <b class="text-white">.keep</b> backup file. You can import this file on any other device to access your notes.
+                        </div>
+                    </div>
+                    
+                    <button id="lockAppBtn" class="p-2.5 bg-[#111111] rounded-[14px] border border-[#262626] text-[#a3a3a3] hover:text-red-400 hover:bg-[#1e1e1e] transition-colors flex items-center justify-center" title="Lock App Now">
+                        <iconify-icon icon="solar:lock-keyhole-linear" width="22"></iconify-icon>
+                    </button>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto pb-10 px-2 md:px-0">
+                
+                <div class="flex justify-center mb-12 w-full relative">
+                    
+                    <div id="collapsedBar" class="w-full max-w-3xl bg-[#111111] shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-[24px] border border-[#262626] h-[52px] flex items-center px-6 cursor-text transition-all hover:border-[#444444]">
+                        <span class="text-[#737373] text-[15px] font-medium">Type your note here...</span>
+                    </div>
+
+                    <div id="expandedArea" class="hidden w-full max-w-3xl bg-[#111111] shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-[24px] border border-[#444444] ring-4 ring-white/5 transition-all overflow-hidden flex-col">
+                        <div class="px-6 py-4 transition-all duration-300 w-full">
+                            <input type="text" id="noteTitle" placeholder="Note Title" class="w-full text-[17px] font-semibold text-white bg-transparent placeholder-[#737373] focus:outline-none mb-3">
+                            
+                            <div class="flex-1 w-full flex flex-col justify-center">
+                                <div id="noteContent" contenteditable="true" class="rich-textarea w-full text-[15px] text-[#e5e5e5] bg-transparent text-left min-h-[40px]" data-placeholder="Type your note here..."></div>
+                                
+                                <div id="checklistContainer" class="hidden w-full space-y-2 mt-1">
+                                    <div id="checklistItems" class="space-y-2"></div>
+                                    <div class="flex items-start gap-3 text-[#737373] pt-1 group">
+                                        <iconify-icon icon="solar:add-circle-linear" width="20" class="flex-shrink-0 text-[#737373] mt-[2px]"></iconify-icon>
+                                        <div id="newChecklistItem" contenteditable="true" class="rich-textarea flex-1 text-[15px] bg-transparent focus:outline-none text-[#e5e5e5] leading-snug" data-placeholder="Add an item..."></div>
+                                        <button id="clearNewItemBtn" class="text-[#737373] hover:text-white transition-opacity p-1 mt-[-2px]" title="Clear or Remove List">
+                                            <iconify-icon icon="solar:close-circle-linear" width="18"></iconify-icon>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="toolbar" class="flex items-center justify-between shrink-0 w-full mt-4 pt-3 border-t border-[#262626]">
+                                
+                                <div class="flex items-center bg-[#1a1a1a] p-1 rounded-xl border border-[#262626] shadow-sm" id="formatToolbar">
+                                    <button onmousedown="event.preventDefault(); document.execCommand('bold', false, null);" class="w-8 h-8 flex items-center justify-center hover:bg-[#262626] rounded-lg font-bold text-[#d4d4d4] transition-colors" title="Bold">B</button>
+                                    <button onmousedown="event.preventDefault(); document.execCommand('italic', false, null);" class="w-8 h-8 flex items-center justify-center hover:bg-[#262626] rounded-lg italic font-serif text-[#d4d4d4] transition-colors" title="Italic">I</button>
+                                    <button onmousedown="event.preventDefault(); document.execCommand('strikeThrough', false, null);" class="w-8 h-8 flex items-center justify-center hover:bg-[#262626] rounded-lg line-through text-[#d4d4d4] transition-colors" title="Strikethrough">S</button>
+                                    
+                                    <div id="listFormatGroup" class="flex items-center">
+                                        <div class="w-px h-5 bg-[#333333] mx-1"></div>
+                                        <button onmousedown="event.preventDefault(); document.execCommand('insertUnorderedList', false, null);" class="w-8 h-8 flex items-center justify-center hover:bg-[#262626] rounded-lg text-[#d4d4d4] font-bold transition-colors" title="Bullet List">•</button>
+                                        <button onmousedown="event.preventDefault(); document.execCommand('insertOrderedList', false, null);" class="w-8 h-8 flex items-center justify-center hover:bg-[#262626] rounded-lg text-[#d4d4d4] font-medium text-[13px] transition-colors" title="Numbered List">1.</button>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center ml-auto">
+                                    <div class="flex gap-1 text-[#a3a3a3] border-r border-[#262626] pr-3 mr-3">
+                                        <button id="toggleListBtn" class="p-2 hover:bg-[#1e1e1e] hover:text-white rounded-xl transition-colors flex items-center justify-center" title="Toggle Checklist">
+                                            <iconify-icon icon="solar:checklist-minimalistic-linear" width="22"></iconify-icon>
+                                        </button>
+                                    </div>
+                                    <button id="addBtn" class="px-5 py-2 bg-white hover:bg-gray-200 text-black text-sm font-semibold rounded-xl transition-colors tracking-wide">Save Note</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="notesContainer" class="w-full max-w-[1400px] mx-auto transition-all duration-300">
+                    </div>
+
+            </div>
+        </main>
+    </div>
+
+    <div id="editModal" class="hidden fixed inset-0 bg-[#000000]/80 backdrop-blur-sm z-50 items-center justify-center p-4">
+        <div class="bg-[#111111] w-full max-w-2xl rounded-[28px] shadow-2xl flex flex-col transform transition-all overflow-hidden border border-[#262626]">
+            <input type="text" id="editTitle" placeholder="Note Title" class="w-full px-6 pt-6 pb-2 text-[18px] font-semibold text-white bg-transparent placeholder-[#737373] focus:outline-none">
+            
+            <div class="px-6 pb-6 pt-2">
+                <div id="editContent" contenteditable="true" class="rich-textarea w-full text-[15px] text-[#e5e5e5] bg-transparent min-h-[80px] leading-relaxed hidden" data-placeholder="Type your note here..."></div>
+                
+                <div id="editChecklistContainer" class="hidden w-full space-y-2 pb-2 pt-2">
+                    <div id="editChecklistItems" class="space-y-2"></div>
+                    <div class="flex items-start gap-3 text-[#737373] pt-1 group">
+                        <iconify-icon icon="solar:add-circle-linear" width="20" class="flex-shrink-0 text-[#737373] mt-[2px]"></iconify-icon>
+                        <div id="editNewChecklistItem" contenteditable="true" class="rich-textarea flex-1 text-[15px] bg-transparent focus:outline-none text-[#e5e5e5] leading-snug" data-placeholder="Add an item..."></div>
+                        <button id="editClearNewItemBtn" class="text-[#737373] hover:text-white transition-opacity p-1 mt-[-2px]">
+                            <iconify-icon icon="solar:close-circle-linear" width="18"></iconify-icon>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-between items-center p-4 px-6 bg-[#0a0a0a] border-t border-[#262626]">
+                <div class="flex items-center bg-[#1a1a1a] p-1 rounded-xl border border-[#262626] shadow-sm">
+                    <button onmousedown="event.preventDefault(); document.execCommand('bold', false, null);" class="w-8 h-8 flex items-center justify-center hover:bg-[#262626] rounded-lg font-bold text-[#d4d4d4]" title="Bold">B</button>
+                    <button onmousedown="event.preventDefault(); document.execCommand('italic', false, null);" class="w-8 h-8 flex items-center justify-center hover:bg-[#262626] rounded-lg italic font-serif text-[#d4d4d4]" title="Italic">I</button>
+                    <button onmousedown="event.preventDefault(); document.execCommand('strikeThrough', false, null);" class="w-8 h-8 flex items-center justify-center hover:bg-[#262626] rounded-lg line-through text-[#d4d4d4]" title="Strikethrough">S</button>
+                    
+                    <div id="editListFormatGroup" class="flex items-center">
+                        <div class="w-px h-5 bg-[#333333] mx-1"></div>
+                        <button onmousedown="event.preventDefault(); document.execCommand('insertUnorderedList', false, null);" class="w-8 h-8 flex items-center justify-center hover:bg-[#262626] rounded-lg text-[#d4d4d4] font-bold" title="Bullet List">•</button>
+                        <button onmousedown="event.preventDefault(); document.execCommand('insertOrderedList', false, null);" class="w-8 h-8 flex items-center justify-center hover:bg-[#262626] rounded-lg text-[#d4d4d4] font-medium text-[13px]" title="Numbered List">1.</button>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="closeEditModal()" class="px-5 py-2.5 text-[#a3a3a3] hover:bg-[#1e1e1e] hover:text-white text-sm font-semibold rounded-xl transition-colors tracking-wide border border-transparent hover:border-[#333333]">Cancel</button>
+                    <button onclick="saveEditNote()" class="px-6 py-2.5 bg-white hover:bg-gray-200 text-black text-sm font-semibold rounded-xl transition-colors tracking-wide">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SESSION_KEY = 'keepSessionAuth';
+        const STORAGE_KEY = 'keepVaultEncrypted';
+        
+        const session = JSON.parse(sessionStorage.getItem(SESSION_KEY) || '{}');
+        if(session.pin && session.lastActive && (Date.now() - session.lastActive < 15 * 60 * 1000) && localStorage.getItem(STORAGE_KEY)) {
+            document.getElementById('lockScreen').classList.add('hidden', 'opacity-0');
+            document.getElementById('appUI').classList.remove('opacity-0', 'pointer-events-none');
+        }
+    </script>
+
+    <script>
+        let notes = [];
+        let currentPin = '';
+        let pendingImportData = null; 
+        const AUTO_LOCK_MS = 15 * 60 * 1000; 
+
+        const lockScreen = document.getElementById('lockScreen');
+        const appUI = document.getElementById('appUI');
+        const pinInputs = document.querySelectorAll('.pin-digit');
+        const pinError = document.getElementById('pinError');
+        const lockTitle = document.getElementById('lockTitle');
+        const lockSubtitle = document.getElementById('lockSubtitle');
+        const importSection = document.getElementById('importSection');
+        const cancelImportBtn = document.getElementById('cancelImportBtn');
+
+        function updateActivity() {
+            if(currentPin) {
+                const sessionData = JSON.parse(sessionStorage.getItem(SESSION_KEY) || '{}');
+                sessionData.lastActive = Date.now();
+                sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+            }
+        }
+        ['mousemove', 'keydown', 'click', 'scroll'].forEach(evt => document.addEventListener(evt, updateActivity));
+
+        setInterval(() => {
+            if(!currentPin) return;
+            const sessionData = JSON.parse(sessionStorage.getItem(SESSION_KEY) || '{}');
+            if(sessionData.lastActive && (Date.now() - sessionData.lastActive > AUTO_LOCK_MS)) {
+                lockApp();
+            }
+        }, 5000);
+
+        function initAuth() {
+            const sessionData = JSON.parse(sessionStorage.getItem(SESSION_KEY) || '{}');
+            const isNewUser = !localStorage.getItem(STORAGE_KEY);
+
+            if(sessionData.pin && sessionData.lastActive && (Date.now() - sessionData.lastActive < AUTO_LOCK_MS) && !isNewUser) {
+                currentPin = sessionData.pin;
+                try {
+                    const encryptedData = localStorage.getItem(STORAGE_KEY);
+                    const bytes = CryptoJS.AES.decrypt(encryptedData, currentPin);
+                    const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
+                    if(!decryptedStr) throw new Error("Bad pin");
+                    
+                    notes = JSON.parse(decryptedStr);
+                    updateActivity();
+                    bootApp();
+                    return;
+                } catch(e) {
+                    sessionStorage.removeItem(SESSION_KEY);
+                    currentPin = '';
+                }
+            }
+
+            lockScreen.classList.remove('hidden', 'opacity-0');
+            if (isNewUser) {
+                lockTitle.innerText = 'Welcome to Keep';
+                lockSubtitle.innerText = 'Create a 4-digit PIN to secure your notes on this device.';
+            } else {
+                lockTitle.innerText = 'Welcome Back';
+                lockSubtitle.innerText = 'Enter your 4-digit PIN to unlock your workspace.';
+            }
+            setTimeout(() => pinInputs[0].focus(), 100);
+        }
+
+        pinInputs.forEach((input, index) => {
+            input.addEventListener('input', (e) => {
+                input.value = input.value.replace(/[^0-9]/g, '');
+                if (input.value.length === 1) {
+                    if (index < pinInputs.length - 1) {
+                        pinInputs[index + 1].focus();
+                    } else {
+                        input.blur();
+                        setTimeout(handleAuth, 50); 
+                    }
+                }
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !input.value && index > 0) {
+                    pinInputs[index - 1].focus();
+                }
+            });
+        });
+
+        function getPin() { return Array.from(pinInputs).map(i => i.value).join(''); }
+        function clearPin() { pinInputs.forEach(i => i.value = ''); pinInputs[0].focus(); }
+
+        function handleAuth() {
+            const pin = getPin();
+            if(pin.length < 4) return;
+
+            if (pendingImportData) {
+                try {
+                    const bytes = CryptoJS.AES.decrypt(pendingImportData, pin);
+                    const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
+                    
+                    if(!decryptedStr) throw new Error("Bad password");
+                    
+                    localStorage.setItem(STORAGE_KEY, pendingImportData);
+                    notes = JSON.parse(decryptedStr);
+                    currentPin = pin;
+                    pendingImportData = null; 
+                    createSession(pin);
+                    
+                    cancelImportBtn.classList.add('hidden');
+                    importSection.classList.remove('hidden');
+                    
+                    bootApp();
+                } catch (e) {
+                    showError('Error: The PIN does not match this backup file.');
+                }
+                return;
+            }
+
+            const isNewUser = !localStorage.getItem(STORAGE_KEY);
+
+            if (isNewUser) {
+                currentPin = pin;
+                notes = [];
+                saveNotesToVault();
+                createSession(pin);
+                bootApp();
+            } else {
+                const encryptedData = localStorage.getItem(STORAGE_KEY);
+                try {
+                    const bytes = CryptoJS.AES.decrypt(encryptedData, pin);
+                    const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
+                    
+                    if(!decryptedStr) throw new Error("Bad password");
+                    
+                    notes = JSON.parse(decryptedStr);
+                    currentPin = pin;
+                    createSession(pin);
+                    bootApp();
+                } catch (e) {
+                    showError('Incorrect PIN. Please try again.');
+                }
+            }
+        }
+
+        function createSession(pin) {
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify({ pin: pin, lastActive: Date.now() }));
+        }
+
+        function showError(msg) {
+            pinError.innerText = msg;
+            pinError.classList.remove('hidden');
+            clearPin();
+            pinInputs.forEach(input => input.classList.add('ring-2', 'ring-red-500/50', 'border-red-500/50'));
+            setTimeout(() => {
+                pinInputs.forEach(input => input.classList.remove('ring-2', 'ring-red-500/50', 'border-red-500/50'));
+                pinError.classList.add('hidden');
+            }, 3000);
+        }
+
+        function bootApp() {
+            lockScreen.classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                appUI.classList.remove('opacity-0', 'pointer-events-none');
+                renderNotes();
+            }, 300);
+        }
+
+        function lockApp() {
+            currentPin = '';
+            notes = [];
+            clearPin();
+            sessionStorage.removeItem(SESSION_KEY);
+            initAuth(); 
+            
+            appUI.classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                lockScreen.classList.remove('opacity-0', 'pointer-events-none');
+            }, 300);
+        }
+
+        document.getElementById('lockAppBtn').addEventListener('click', lockApp);
+
+        function saveNotesToVault() {
+            if(!currentPin) return;
+            const encryptedStr = CryptoJS.AES.encrypt(JSON.stringify(notes), currentPin).toString();
+            localStorage.setItem(STORAGE_KEY, encryptedStr);
+        }
+        
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            if(!currentPin) return;
+            const encryptedData = localStorage.getItem(STORAGE_KEY);
+            const blob = new Blob([encryptedData], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `keep-backup-${new Date().toISOString().split('T')[0]}.keep`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        document.getElementById('importBackupInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                pendingImportData = e.target.result;
+                
+                lockTitle.innerText = 'Unlock Backup';
+                lockSubtitle.innerText = 'Backup loaded. Enter the PIN originally used to secure this file.';
+                importSection.classList.add('hidden');
+                cancelImportBtn.classList.remove('hidden');
+                
+                clearPin();
+            };
+            reader.readAsText(file);
+            e.target.value = ''; 
+        });
+
+        cancelImportBtn.addEventListener('click', () => {
+            pendingImportData = null;
+            cancelImportBtn.classList.add('hidden');
+            importSection.classList.remove('hidden');
+            clearPin();
+            initAuth(); 
+        });
+
+        let currentView = 'grid'; 
+        let isListMode = false;
+        let filterTerm = '';
+
+        const container = document.getElementById('notesContainer');
+        const viewToggleBtn = document.getElementById('viewToggle');
+        const viewIcon = document.getElementById('viewIcon');
+        const searchInput = document.getElementById('searchInput');
+        
+        const collapsedBar = document.getElementById('collapsedBar');
+        const expandedArea = document.getElementById('expandedArea');
+        const noteTitleInput = document.getElementById('noteTitle');
+        const noteContentInput = document.getElementById('noteContent');
+        const listFormatGroup = document.getElementById('listFormatGroup');
+        
+        const toggleListBtn = document.getElementById('toggleListBtn');
+        const checklistContainer = document.getElementById('checklistContainer');
+        const checklistItemsDiv = document.getElementById('checklistItems');
+        const newChecklistItemInput = document.getElementById('newChecklistItem');
+        let tempChecklist = [];
+
+        let sortableInstance = new Sortable(container, {
+            animation: 250,
+            easing: "cubic-bezier(0.2, 0, 0, 1)", 
+            ghostClass: 'sortable-ghost',
+            dragClass: 'sortable-drag',
+            fallbackClass: 'sortable-fallback',
+            forceFallback: true, 
+            draggable: '.card-wrapper',
+            delay: 150, 
+            delayOnTouchOnly: true,
+            onEnd: function (evt) {
+                const movedItem = notes.splice(evt.oldIndex, 1)[0];
+                notes.splice(evt.newIndex, 0, movedItem);
+                saveNotesToVault();
+            }
+        });
+
+        collapsedBar.addEventListener('click', (e) => {
+            e.preventDefault();
+            collapsedBar.classList.add('hidden');
+            expandedArea.classList.remove('hidden');
+            expandedArea.classList.add('flex');
+            
+            isListMode = false;
+            noteContentInput.classList.remove('hidden');
+            checklistContainer.classList.add('hidden');
+            listFormatGroup.style.display = 'flex';
+            
+            setTimeout(() => noteTitleInput.focus(), 50);
+        });
+
+        function collapseInput() {
+            resetInputState();
+            expandedArea.classList.add('hidden');
+            expandedArea.classList.remove('flex');
+            collapsedBar.classList.remove('hidden');
+        }
+
+        document.addEventListener('mousedown', (e) => {
+            if (!expandedArea.classList.contains('hidden')) {
+                if (!expandedArea.contains(e.target) && e.target.id !== 'addBtn' && !lockScreen.contains(e.target) && !document.getElementById('editModal').contains(e.target)) {
+                    let contentHTML = noteContentInput.innerHTML.trim();
+                    if(contentHTML === '<br>' || contentHTML === '<div><br></div>') contentHTML = '';
+
+                    if(noteTitleInput.value.trim() || contentHTML || tempChecklist.length > 0) {
+                        addNote();
+                    } else {
+                        collapseInput();
+                    }
+                }
+            }
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            filterTerm = e.target.value.toLowerCase();
+            sortableInstance.option("disabled", filterTerm.length > 0);
+            renderNotes();
+        });
+
+        toggleListBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            isListMode = !isListMode;
+            
+            if(isListMode) {
+                noteContentInput.classList.add('hidden');
+                checklistContainer.classList.remove('hidden');
+                listFormatGroup.style.display = 'none'; 
+                
+                let text = noteContentInput.innerHTML.trim();
+                if(text && text !== '<br>' && text !== '<div><br></div>') {
+                    tempChecklist.push({ text: text, checked: false });
+                    noteContentInput.innerHTML = '';
+                    renderTempChecklist();
+                }
+                newChecklistItemInput.focus();
+            } else {
+                noteContentInput.classList.remove('hidden');
+                checklistContainer.classList.add('hidden');
+                listFormatGroup.style.display = 'flex'; 
+                
+                let combinedText = tempChecklist.map(item => item.text).join('<br>');
+                if(combinedText) {
+                    noteContentInput.innerHTML = combinedText;
+                }
+                tempChecklist = [];
+                renderTempChecklist();
+                newChecklistItemInput.innerHTML = '';
+                noteContentInput.focus();
+            }
+        });
+
+        document.getElementById('clearNewItemBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if(newChecklistItemInput.innerHTML.trim() === '' && tempChecklist.length === 0) {
+                isListMode = false;
+                checklistContainer.classList.add('hidden');
+                noteContentInput.classList.remove('hidden');
+                listFormatGroup.style.display = 'flex'; 
+                noteContentInput.focus();
+            } else {
+                newChecklistItemInput.innerHTML = '';
+                newChecklistItemInput.focus();
+            }
+        });
+
+        document.getElementById('editClearNewItemBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const editNewInput = document.getElementById('editNewChecklistItem');
+            if(editNewInput.innerHTML.trim() === '' && editingListItems.length === 0) {
+                document.getElementById('editChecklistContainer').classList.add('hidden');
+                document.getElementById('editContent').classList.remove('hidden');
+                document.getElementById('editListFormatGroup').style.display = 'flex';
+                document.getElementById('editContent').focus();
+                
+                const note = notes.find(n => n.id === editingNoteId);
+                if(note) note.type = 'text';
+            } else {
+                editNewInput.innerHTML = '';
+                editNewInput.focus();
+            }
+        });
+
+        newChecklistItemInput.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') {
+                e.preventDefault();
+                let val = newChecklistItemInput.innerHTML.trim();
+                if(val === '<br>' || val === '<div><br></div>') val = '';
+                if(val) {
+                    tempChecklist.push({ text: val, checked: false });
+                    newChecklistItemInput.innerHTML = '';
+                    renderTempChecklist();
+                }
+            }
+        });
+
+        function renderTempChecklist() {
+            checklistItemsDiv.innerHTML = tempChecklist.map((item, index) => `
+                <div class="flex items-start gap-3 group">
+                    <input type="checkbox" disabled class="opacity-50 mt-1">
+                    <div contenteditable="true" class="checklist-item-text flex-1 text-[15px] bg-transparent focus:outline-none text-[#e5e5e5] rich-content leading-snug" oninput="updateTempListItemText(${index}, this.innerHTML)">${item.text}</div>
+                    <button type="button" onclick="removeTempListItem(${index})" class="ml-auto text-[#737373] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                        <iconify-icon icon="solar:close-circle-linear" width="18"></iconify-icon>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        window.updateTempListItemText = (index, val) => {
+            tempChecklist[index].text = val;
+        };
+
+        window.removeTempListItem = (index) => {
+            tempChecklist.splice(index, 1);
+            renderTempChecklist();
+        };
+
+        function resetInputState() {
+            noteTitleInput.value = '';
+            noteContentInput.innerHTML = '';
+            newChecklistItemInput.innerHTML = '';
+            isListMode = false;
+            tempChecklist = [];
+            
+            noteContentInput.classList.remove('hidden');
+            checklistContainer.classList.add('hidden');
+            checklistItemsDiv.innerHTML = '';
+            listFormatGroup.style.display = 'flex';
+        }
+
+        function toggleNoteCheck(event, noteId, itemIndex) {
+            if(event) event.stopPropagation();
+            const note = notes.find(n => n.id === noteId);
+            if(note && note.type === 'list') {
+                note.listItems[itemIndex].checked = !note.listItems[itemIndex].checked;
+                saveNotesToVault();
+                renderNotes();
+            }
+        }
+
+        function deleteNote(id) {
+            notes = notes.filter(note => note.id !== id);
+            saveNotesToVault();
+            renderNotes();
+        }
+
+        let editingNoteId = null;
+        let editingListItems = [];
+        const editModal = document.getElementById('editModal');
+        const editTitleInput = document.getElementById('editTitle');
+        const editContentInput = document.getElementById('editContent');
+        const editChecklistContainer = document.getElementById('editChecklistContainer');
+        const editChecklistItemsDiv = document.getElementById('editChecklistItems');
+        const editNewChecklistItemInput = document.getElementById('editNewChecklistItem');
+        const editListFormatGroup = document.getElementById('editListFormatGroup');
+
+        window.openEditModal = (id) => {
+            const note = notes.find(n => n.id === id);
+            if (!note) return;
+            
+            editingNoteId = id;
+            editTitleInput.value = note.title;
+
+            if (note.type === 'list') {
+                editContentInput.classList.add('hidden');
+                editChecklistContainer.classList.remove('hidden');
+                editListFormatGroup.style.display = 'none';
+                editingListItems = JSON.parse(JSON.stringify(note.listItems)); 
+                renderEditChecklist();
+            } else {
+                editChecklistContainer.classList.add('hidden');
+                editContentInput.classList.remove('hidden');
+                editListFormatGroup.style.display = 'flex';
+                editContentInput.innerHTML = note.content;
+            }
+
+            editModal.classList.remove('hidden');
+            editModal.classList.add('flex');
+        };
+
+        window.closeEditModal = () => {
+            editModal.classList.add('hidden');
+            editModal.classList.remove('flex');
+            editingNoteId = null;
+            editingListItems = [];
+            editNewChecklistItemInput.innerHTML = '';
+        };
+
+        window.saveEditNote = () => {
+            if (editingNoteId === null) return;
+            const note = notes.find(n => n.id === editingNoteId);
+            
+            if (note) {
+                note.title = editTitleInput.value.trim();
+                
+                if (note.type === 'list') {
+                    let val = editNewChecklistItemInput.innerHTML.trim();
+                    if(val && val !== '<br>' && val !== '<div><br></div>') {
+                        editingListItems.push({ text: val, checked: false });
+                    }
+                    note.listItems = [...editingListItems];
+                } else {
+                    let cHTML = editContentInput.innerHTML.trim();
+                    if(cHTML === '<br>' || cHTML === '<div><br></div>') cHTML = '';
+                    note.content = cHTML;
+                }
+            }
+            
+            saveNotesToVault();
+            closeEditModal();
+            renderNotes();
+        };
+
+        function renderEditChecklist() {
+            editChecklistItemsDiv.innerHTML = editingListItems.map((item, index) => `
+                <div class="flex items-start gap-3 group">
+                    <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleEditItemCheck(${index})" class="mt-1">
+                    <div contenteditable="true" class="flex-1 text-[15px] bg-transparent focus:outline-none rich-content leading-snug ${item.checked ? 'checked-text' : 'text-[#e5e5e5]'}" oninput="updateEditItemText(${index}, this.innerHTML)">${item.text}</div>
+                    <button type="button" onclick="removeEditListItem(${index})" class="ml-auto text-[#737373] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                        <iconify-icon icon="solar:close-circle-linear" width="18"></iconify-icon>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        window.toggleEditItemCheck = (index) => {
+            editingListItems[index].checked = !editingListItems[index].checked;
+            renderEditChecklist();
+        };
+
+        window.updateEditItemText = (index, val) => {
+            editingListItems[index].text = val;
+        };
+
+        window.removeEditListItem = (index) => {
+            editingListItems.splice(index, 1);
+            renderEditChecklist();
+        };
+
+        editNewChecklistItemInput.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') {
+                e.preventDefault();
+                let val = editNewChecklistItemInput.innerHTML.trim();
+                if(val === '<br>' || val === '<div><br></div>') val = '';
+                if(val) {
+                    editingListItems.push({ text: val, checked: false });
+                    editNewChecklistItemInput.innerHTML = '';
+                    renderEditChecklist();
+                }
+            }
+        });
+
+        editModal.addEventListener('mousedown', (e) => {
+            if (e.target === editModal) saveEditNote();
+        });
+
+        function renderNotes() {
+            container.innerHTML = '';
+            
+            const filteredNotes = notes.filter(note => {
+                const searchStr = filterTerm;
+                if(!searchStr) return true;
+                
+                const inTitle = note.title.toLowerCase().includes(searchStr);
+                const inContent = note.content.toLowerCase().includes(searchStr);
+                const inList = note.type === 'list' && note.listItems.some(li => li.text.toLowerCase().includes(searchStr));
+                
+                return inTitle || inContent || inList;
+            });
+
+            if (filteredNotes.length === 0) {
+                container.className = 'flex flex-col items-center justify-center w-full py-16 opacity-80';
+                container.innerHTML = `
+                    <div class="w-24 h-24 bg-[#111111] rounded-[22px] border border-[#262626] flex items-center justify-center mb-6 shadow-lg">
+                        <iconify-icon icon="solar:document-add-linear" width="42" class="text-[#737373]"></iconify-icon>
+                    </div>
+                    <h3 class="text-[18px] font-semibold text-white mb-1.5 tracking-tight">${filterTerm ? 'No matching notes found' : 'Your workspace is empty'}</h3>
+                    <p class="text-[#a3a3a3] text-[15px]">${filterTerm ? 'Try searching with a different word.' : 'Write your first note above to get started.'}</p>
+                `;
+                return; 
+            }
+
+            if (currentView === 'list') {
+                container.className = 'flex flex-col w-full max-w-2xl mx-auto gap-4 block';
+                viewIcon.setAttribute('icon', 'solar:gallery-minimalistic-linear'); 
+            } else {
+                container.className = 'columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 w-full mx-auto';
+                viewIcon.setAttribute('icon', 'solar:list-linear');
+            }
+
+            filteredNotes.forEach(note => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'card-wrapper break-inside-avoid w-full inline-block mb-4 pb-2';
+
+                const card = document.createElement('div');
+                card.className = `bg-[#111111] rounded-[20px] border border-[#262626] hover:border-[#444444] transition-all duration-300 group relative overflow-hidden flex flex-col`;
+                card.onclick = () => openEditModal(note.id);
+                
+                let contentHtml = '';
+                if (note.type === 'list') {
+                    contentHtml = `<div class="space-y-3 mt-1">` + 
+                        note.listItems.map((item, idx) => `
+                            <div class="flex items-start gap-3 group/item">
+                                <input type="checkbox" ${item.checked ? 'checked' : ''} onclick="toggleNoteCheck(event, ${note.id}, ${idx})" class="mt-1">
+                                <div contenteditable="true" class="checklist-item-text flex-1 text-[14.5px] leading-snug rich-content ${item.checked ? 'checked-text' : 'text-[#e5e5e5]'}" oninput="updateNoteListItemText(${note.id}, ${idx}, this.innerHTML)">${item.text}</div>
+                                <button type="button" onclick="event.stopPropagation(); removeNoteListItem(${note.id}, ${idx})" class="ml-auto text-[#737373] hover:text-red-400 opacity-0 group-hover/item:opacity-100 transition-opacity p-1">
+                                    <iconify-icon icon="solar:close-circle-linear" width="18"></iconify-icon>
+                                </button>
+                            </div>
+                        `).join('') + 
+                    `</div>`;
+                } else {
+                    contentHtml = `<div class="rich-content text-[14.5px] leading-relaxed text-[#d4d4d4]">${note.content}</div>`;
+                }
+                
+                card.innerHTML = `
+                    <div class="p-5 pb-16">
+                        ${note.title ? `<h3 class="font-semibold text-[16px] text-white mb-2.5 tracking-tight">${note.title}</h3>` : ''}
+                        ${contentHtml}
+                    </div>
+                    
+                    <div class="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-[#111111]/90 backdrop-blur rounded-xl p-0.5 border border-[#262626] shadow-sm cursor-default">
+                         <button onclick="event.stopPropagation(); openEditModal(${note.id})" title="Edit" class="p-1.5 text-[#a3a3a3] hover:text-white hover:bg-[#1e1e1e] rounded-lg transition-colors flex items-center justify-center">
+                             <iconify-icon icon="solar:pen-new-round-linear" width="18"></iconify-icon>
+                         </button>
+                         <button onclick="event.stopPropagation(); deleteNote(${note.id})" title="Delete Note" class="p-1.5 text-[#a3a3a3] hover:text-red-400 hover:bg-[#1e1e1e] rounded-lg transition-colors flex items-center justify-center">
+                             <iconify-icon icon="solar:trash-bin-minimalistic-linear" width="18"></iconify-icon>
+                         </button>
+                    </div>
+                `;
+                
+                wrapper.appendChild(card);
+                container.appendChild(wrapper);
+            });
+        }
+
+        window.updateNoteListItemText = (noteId, itemIndex, val) => {
+            const note = notes.find(n => n.id === noteId);
+            if(note && note.type === 'list') {
+                note.listItems[itemIndex].text = val;
+                saveNotesToVault();
+            }
+        };
+
+        window.removeNoteListItem = (noteId, itemIndex) => {
+            const note = notes.find(n => n.id === noteId);
+            if(note && note.type === 'list') {
+                note.listItems.splice(itemIndex, 1);
+                saveNotesToVault();
+                renderNotes();
+            }
+        };
+
+        function addNote() {
+            const title = noteTitleInput.value.trim();
+            
+            let contentHTML = noteContentInput.innerHTML.trim();
+            if(contentHTML === '<br>' || contentHTML === '<div><br></div>') contentHTML = '';
+            
+            if (isListMode) {
+                let val = newChecklistItemInput.innerHTML.trim();
+                if(val && val !== '<br>' && val !== '<div><br></div>') {
+                    tempChecklist.push({ text: val, checked: false });
+                }
+            }
+
+            if (title || contentHTML || tempChecklist.length > 0) {
+                notes.unshift({
+                    id: Date.now(),
+                    type: isListMode ? 'list' : 'text',
+                    title: title,
+                    content: contentHTML,
+                    listItems: isListMode ? [...tempChecklist] : [],
+                });
+                saveNotesToVault();
+                renderNotes();
+            }
+            
+            collapseInput();
+        }
+
+        function toggleView() {
+            currentView = currentView === 'list' ? 'grid' : 'list';
+            renderNotes();
+        }
+
+        viewToggleBtn.addEventListener('click', toggleView);
+        document.getElementById('addBtn').addEventListener('mousedown', (e) => {
+            e.preventDefault(); 
+            addNote();
+        });
+
+        initAuth();
+    </script>
+</body>
+</html>
